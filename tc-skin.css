@@ -1,0 +1,441 @@
+/* =============================================================================
+   Tyler-Computer Editorial Defiant skin
+   =============================================================================
+   Injected into LibreChat by an nginx reverse proxy sub_filter on </head>.
+
+   Strategy: don't fight LibreChat's Tailwind utility classes at the class
+   level (would need !important on hundreds of selectors). Instead:
+   1. Override LibreChat's design tokens at :root + .dark via CSS custom
+      properties. Tailwind's color/radius/font utilities consume these.
+   2. Replace the font stacks globally on html/body — every nested element
+      inherits via the CSS cascade.
+   3. Hit a handful of structural elements (sidebar, chat thread, input bar,
+      top nav) with high-specificity selectors for the moments that need
+      explicit treatment (drop caps, ragged-right body, small-caps labels).
+
+   Iterate by editing this file in /c/Users/tyler/tyler-computer/skin/, then
+   `docker compose build && docker compose push` + redeploy the proxy service
+   on Railway. Hot-reload is 30-60s.
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   1. Tokens — colors, type, motion, hairlines.
+   Mirrors the landing page so the brand is one system.
+   -------------------------------------------------------------------------- */
+
+:root,
+:root.light,
+html[data-theme="light"] {
+  /* Editorial Defiant palette — cream, ink, oxblood, hairlines */
+  --tc-paper:        #f5f1ea;
+  --tc-paper-tint:   #ebe5d9;
+  --tc-paper-soft:   #faf7f1;
+  --tc-ink:          #1a1a1a;
+  --tc-ink-soft:     #4a4a48;
+  --tc-ink-faint:    #8b8a86;
+  --tc-oxblood:      #6b1e1e;
+  --tc-oxblood-soft: #8a3535;
+  --tc-rule:         #bcb6a8;
+  --tc-rule-soft:    #d8d3c4;
+
+  /* LibreChat token overrides (light) — these are the names LibreChat's
+     Tailwind plugin reads. Verified by inspecting the bundled CSS. */
+  --surface-primary:        var(--tc-paper);
+  --surface-secondary:      var(--tc-paper-soft);
+  --surface-tertiary:       var(--tc-paper-tint);
+  --surface-active:         var(--tc-paper-tint);
+  --surface-active-alt:     var(--tc-paper-tint);
+  --surface-hover:          var(--tc-paper-tint);
+  --surface-hover-alt:      var(--tc-rule-soft);
+  --surface-submit:         var(--tc-ink);
+  --surface-submit-hover:   var(--tc-oxblood);
+  --surface-destructive:    var(--tc-oxblood);
+  --surface-chat:           var(--tc-paper);
+
+  --text-primary:           var(--tc-ink);
+  --text-secondary:         var(--tc-ink-soft);
+  --text-secondary-alt:     var(--tc-ink-soft);
+  --text-tertiary:          var(--tc-ink-faint);
+  --text-warning:           var(--tc-oxblood);
+  --text-error:             var(--tc-oxblood);
+
+  --border-light:           var(--tc-rule-soft);
+  --border-medium:          var(--tc-rule);
+  --border-heavy:           var(--tc-ink);
+  --border-xheavy:          var(--tc-ink);
+  --border-token-color:     var(--tc-rule);
+
+  --brand-purple:           var(--tc-oxblood);
+  --presentation:           var(--tc-paper);
+
+  /* Type families */
+  --tc-display: 'Fraunces', 'Times New Roman', Georgia, serif;
+  --tc-body:    'Source Serif 4', 'Source Serif Pro', Georgia, 'Times New Roman', serif;
+  --tc-mono:    ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  --font-sans:  var(--tc-body);   /* LibreChat sometimes references --font-sans */
+  --font-serif: var(--tc-display);
+  --font-mono:  var(--tc-mono);
+
+  /* Motion */
+  --tc-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --tc-dur-fast: 180ms;
+}
+
+:root.dark,
+html[data-theme="dark"] {
+  /* Dark mode inverts to deep ink with cream type. Same accent. */
+  --tc-paper:        #181715;       /* warm near-black, not pure black */
+  --tc-paper-tint:   #211f1c;
+  --tc-paper-soft:   #1f1d1b;
+  --tc-ink:          #f5f1ea;       /* cream ink on dark paper */
+  --tc-ink-soft:     #c8c2b4;
+  --tc-ink-faint:    #8b8579;
+  --tc-oxblood:      #c97a7a;       /* lighter oxblood — preserves contrast on dark */
+  --tc-oxblood-soft: #a45252;
+  --tc-rule:         #3a3733;
+  --tc-rule-soft:    #2a2825;
+
+  --surface-primary:        var(--tc-paper);
+  --surface-secondary:      var(--tc-paper-soft);
+  --surface-tertiary:       var(--tc-paper-tint);
+  --surface-active:         var(--tc-paper-tint);
+  --surface-active-alt:     var(--tc-paper-tint);
+  --surface-hover:          var(--tc-paper-tint);
+  --surface-hover-alt:      var(--tc-rule-soft);
+  --surface-submit:         var(--tc-ink);
+  --surface-submit-hover:   var(--tc-oxblood);
+  --surface-destructive:    var(--tc-oxblood);
+  --surface-chat:           var(--tc-paper);
+
+  --text-primary:           var(--tc-ink);
+  --text-secondary:         var(--tc-ink-soft);
+  --text-secondary-alt:     var(--tc-ink-soft);
+  --text-tertiary:          var(--tc-ink-faint);
+  --text-warning:           var(--tc-oxblood);
+  --text-error:             var(--tc-oxblood);
+
+  --border-light:           var(--tc-rule-soft);
+  --border-medium:          var(--tc-rule);
+  --border-heavy:           var(--tc-ink-soft);
+  --border-xheavy:          var(--tc-ink);
+  --border-token-color:     var(--tc-rule);
+
+  --brand-purple:           var(--tc-oxblood);
+  --presentation:           var(--tc-paper);
+}
+
+/* -----------------------------------------------------------------------------
+   2. Type — replace LibreChat's Inter stack with Source Serif + Fraunces.
+   The `*` selector below catches Tailwind's font-family utility classes that
+   set `font-family: var(--font-sans)` at the element level.
+   -------------------------------------------------------------------------- */
+
+html,
+body,
+button,
+input,
+textarea,
+select,
+[contenteditable] {
+  font-family: var(--tc-body) !important;
+  font-feature-settings: "kern" 1, "liga" 1, "onum" 1;  /* old-style figures */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display type — headings, model picker labels, brand wordmark */
+h1, h2, h3, h4, h5, h6,
+[role="heading"],
+.text-token-text-primary.font-semibold,        /* common LibreChat heading */
+[class*="text-2xl"], [class*="text-3xl"],
+[class*="text-xl"][class*="font-bold"] {
+  font-family: var(--tc-display) !important;
+  font-variation-settings: "SOFT" 30, "WONK" 0, "opsz" 60;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+/* Mono — code blocks, file paths, JSON */
+code,
+pre,
+kbd,
+samp,
+.font-mono,
+[class*="font-mono"] {
+  font-family: var(--tc-mono) !important;
+  font-variation-settings: normal;
+}
+
+/* -----------------------------------------------------------------------------
+   3. Surfaces — paint LibreChat's panels with cream + hairlines.
+   -------------------------------------------------------------------------- */
+
+body,
+#root,
+main,
+[class*="bg-token-surface-primary"],
+[class*="bg-token-surface-chat"] {
+  background: var(--tc-paper) !important;
+}
+
+/* Sidebar — left column with conversation list */
+nav[aria-label="Chat history"],
+[class*="bg-token-surface-secondary"],
+aside {
+  background: var(--tc-paper-soft) !important;
+  border-right: 1px solid var(--tc-rule-soft) !important;
+}
+
+/* Top bar / model picker */
+header,
+[class*="border-token-border-medium"],
+[role="banner"] {
+  border-color: var(--tc-rule-soft) !important;
+  background: var(--tc-paper) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   4. Chat thread — magazine typography on assistant messages.
+   -------------------------------------------------------------------------- */
+
+/* Assistant message body — ragged-right serif body text, generous line-height */
+.message-content[data-message-author-role="assistant"],
+[data-message-author-role="assistant"] .markdown,
+[data-message-author-role="assistant"] .prose {
+  font-family: var(--tc-body) !important;
+  font-size: 1.0625rem !important;
+  line-height: 1.65 !important;
+  text-align: left !important;       /* ragged-right, never justified */
+  text-wrap: pretty;
+  hyphens: auto;
+  color: var(--tc-ink);
+}
+
+/* Drop cap on the first paragraph of an assistant response — the magazine
+   moment. Only applies when the first child is a paragraph (skip when the
+   assistant leads with a code block or list). */
+[data-message-author-role="assistant"] .markdown > p:first-child::first-letter,
+[data-message-author-role="assistant"] .prose > p:first-child::first-letter {
+  font-family: var(--tc-display);
+  font-variation-settings: "SOFT" 30, "WONK" 0, "opsz" 144;
+  font-weight: 500;
+  font-size: 4.2em;
+  line-height: 0.85;
+  float: left;
+  margin: 0.08em 0.12em -0.05em 0;
+  color: var(--tc-oxblood);
+}
+
+/* User message body — same serif, no drop cap, lighter weight presence */
+[data-message-author-role="user"] .markdown,
+[data-message-author-role="user"] .prose {
+  font-family: var(--tc-body) !important;
+  font-style: italic;
+  color: var(--tc-ink-soft);
+}
+
+/* Author label above each message (You / AI name) — small caps editorial */
+[data-message-author-role] .text-xs,
+[data-message-author-role] [class*="text-token-text-secondary"]:first-child {
+  font-family: var(--tc-body);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.7rem !important;
+  font-weight: 600;
+  color: var(--tc-ink-soft);
+}
+
+/* Horizontal rule between messages — thin hairline, not the heavy gray */
+[role="separator"],
+hr {
+  border: 0 !important;
+  border-top: 1px solid var(--tc-rule-soft) !important;
+  margin: 1.5rem 0 !important;
+}
+
+/* -----------------------------------------------------------------------------
+   5. Input bar — bottom textarea + send button, magazine-grade.
+   -------------------------------------------------------------------------- */
+
+textarea,
+[contenteditable="true"][role="textbox"] {
+  font-family: var(--tc-body) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.5 !important;
+  background: var(--tc-paper-soft) !important;
+  border: 1px solid var(--tc-rule) !important;
+  border-radius: 2px !important;     /* hard edges, not pill */
+  color: var(--tc-ink) !important;
+}
+
+textarea::placeholder,
+[contenteditable="true"]:empty:before {
+  color: var(--tc-ink-faint) !important;
+  font-style: italic;
+}
+
+textarea:focus-visible,
+[contenteditable="true"]:focus-visible {
+  outline: 2px solid var(--tc-oxblood) !important;
+  outline-offset: 2px !important;
+  border-color: var(--tc-oxblood) !important;
+}
+
+/* Send button — black with cream label, like the magazine cover CTA */
+button[type="submit"],
+button[aria-label*="Send" i],
+button[aria-label*="submit" i] {
+  background: var(--tc-ink) !important;
+  color: var(--tc-paper) !important;
+  border: 1px solid var(--tc-ink) !important;
+  border-radius: 2px !important;
+  font-family: var(--tc-body) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.04em !important;
+  transition: background var(--tc-dur-fast) var(--tc-ease-out),
+              border-color var(--tc-dur-fast) var(--tc-ease-out) !important;
+}
+
+button[type="submit"]:hover,
+button[aria-label*="Send" i]:hover {
+  background: var(--tc-oxblood) !important;
+  border-color: var(--tc-oxblood) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   6. Buttons everywhere — square corners, ink/oxblood palette.
+   -------------------------------------------------------------------------- */
+
+button,
+[role="button"] {
+  border-radius: 2px !important;
+  font-family: var(--tc-body) !important;
+  transition: background var(--tc-dur-fast) var(--tc-ease-out),
+              color var(--tc-dur-fast) var(--tc-ease-out) !important;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--tc-oxblood) !important;
+  outline-offset: 2px !important;
+}
+
+/* Primary-action ghost buttons — keep them visible but quieter */
+button.bg-token-surface-tertiary,
+button[class*="bg-token-surface-active"] {
+  background: var(--tc-paper-tint) !important;
+  color: var(--tc-ink) !important;
+  border: 1px solid var(--tc-rule) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   7. Model picker / dropdowns — small-caps section labels in popovers.
+   -------------------------------------------------------------------------- */
+
+[role="combobox"],
+[role="listbox"],
+[role="menu"] {
+  background: var(--tc-paper) !important;
+  border: 1px solid var(--tc-rule) !important;
+  border-radius: 2px !important;
+  font-family: var(--tc-body) !important;
+}
+
+[role="menuitem"],
+[role="option"] {
+  font-family: var(--tc-body) !important;
+  border-radius: 0 !important;
+}
+
+[role="menuitem"]:hover,
+[role="option"]:hover,
+[role="option"][data-highlighted="true"] {
+  background: var(--tc-paper-tint) !important;
+  color: var(--tc-ink) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   8. Brand wordmark — replace LibreChat's "LibreChat" text with our wordmark
+   wherever it appears. We can't change the React JSX from CSS, but we can
+   hide it and inject our own via ::before on a sentinel container.
+   -------------------------------------------------------------------------- */
+
+/* Page title in nav header — only replace the text node, not icons */
+[class*="app-title"],
+.text-token-text-primary[class*="text-lg"][class*="font-bold"] {
+  font-family: var(--tc-display) !important;
+  font-variation-settings: "SOFT" 60, "opsz" 144;
+  letter-spacing: -0.02em;
+}
+
+/* -----------------------------------------------------------------------------
+   9. Code blocks — keep them mono but tinted to the warm palette.
+   -------------------------------------------------------------------------- */
+
+pre,
+pre code,
+[class*="bg-token-surface-secondary"] pre {
+  background: var(--tc-paper-tint) !important;
+  color: var(--tc-ink) !important;
+  border: 1px solid var(--tc-rule-soft) !important;
+  border-radius: 2px !important;
+  font-family: var(--tc-mono) !important;
+  font-size: 0.92em !important;
+}
+
+code:not(pre code) {
+  background: var(--tc-paper-tint) !important;
+  color: var(--tc-oxblood) !important;
+  padding: 0.1em 0.35em !important;
+  border-radius: 2px !important;
+  font-family: var(--tc-mono) !important;
+  font-size: 0.9em !important;
+}
+
+/* -----------------------------------------------------------------------------
+   10. Links — oxblood, underline, hover opacity per the landing page.
+   -------------------------------------------------------------------------- */
+
+a, a:visited {
+  color: var(--tc-oxblood) !important;
+  text-decoration: underline !important;
+  text-decoration-color: currentColor !important;
+  text-underline-offset: 3px !important;
+  transition: opacity var(--tc-dur-fast) var(--tc-ease-out) !important;
+}
+
+a:hover { opacity: 0.7 !important; }
+
+/* -----------------------------------------------------------------------------
+   11. Accessibility — never weaken focus rings, always honor reduced motion.
+   -------------------------------------------------------------------------- */
+
+*:focus-visible {
+  outline: 2px solid var(--tc-oxblood) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   12. Microtypography polish — sentinel pseudo-element for the colophon
+   feeling. Adds a thin horizontal rule above the input bar to read like a
+   masthead between thread and reply.
+   -------------------------------------------------------------------------- */
+
+form:has(textarea)::before {
+  content: "";
+  display: block;
+  height: 1px;
+  background: var(--tc-rule-soft);
+  margin: 0 0 1rem;
+}
+
+/* End of tc-skin.css */
