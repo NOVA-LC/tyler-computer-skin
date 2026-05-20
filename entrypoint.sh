@@ -16,7 +16,15 @@
 
 set -e
 
-RESOLVERS=$(grep -E "^nameserver " /etc/resolv.conf | awk '{print $2}' | tr '\n' ' ' | sed 's/ $//')
+# nginx resolver syntax requires IPv6 addresses to be wrapped in brackets
+# (e.g. `[fd12::10]`), but /etc/resolv.conf lists them bare (`fd12::10`).
+# Wrap any address that contains a colon (IPv6) and leave IPv4 alone.
+RESOLVERS=$(grep -E "^nameserver " /etc/resolv.conf | awk '{print $2}' | while read -r addr; do
+  case "$addr" in
+    *:*) echo "[$addr]" ;;
+    *)   echo "$addr" ;;
+  esac
+done | tr '\n' ' ' | sed 's/ $//')
 
 if [ -z "$RESOLVERS" ]; then
   echo "[entrypoint] WARNING: /etc/resolv.conf has no nameserver entries. Falling back to 1.1.1.1." >&2
