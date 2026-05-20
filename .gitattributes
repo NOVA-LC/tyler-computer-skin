@@ -1,0 +1,6 @@
+# Force LF for shell scripts so they work in Alpine Linux.
+# Without this, Windows checkout converts to CRLF and `sh /entrypoint.sh`
+# fails with "bad interpreter" or unexplained syntax errors.
+*.sh text eol=lf
+Dockerfile text eol=lf
+nginx.conf text eol=lf
